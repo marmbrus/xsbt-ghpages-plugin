@@ -18,6 +18,7 @@ object GhPages extends Plugin {
 
     def settings: Seq[Setting[_]] = Seq(
       //gitRemoteRepo := "git@github.com:jsuereth/scala-arm.git",
+      parallelExecution in Config := false,
       pagesRepository <<= (name,organization) apply ((n,o) => file(System.getProperty("user.home")) / ".sbt" / "ghpages" / o / n),
       updatedPagesRepository <<= updatedRepo(pagesRepository, gitRemoteRepo, Some("gh-pages")),
       pushAPIDoc <<= pushAPIDoc0,
@@ -44,12 +45,13 @@ object GhPages extends Plugin {
       ()
     }
 
-    private def copyAPIDoc0 = (updatedPagesRepository, doc in Compile, streams) map { (repo, newAPI, s) =>
-      git("rm", "-r", "--ignore-unmatch", "latest")(repo, s.log)
-      if(repo / "latest" exists) {
-        IO.delete(repo / "latest")
+    private def copyAPIDoc0 = (updatedPagesRepository, doc in Compile, thisProjectRef, streams) map { (repo, newAPI, currentProject, s) =>
+      val publishLocation = repo / currentProject.project / "latest"
+      git("rm", "-r", "--ignore-unmatch", publishLocation.toString)(repo, s.log)
+      if(publishLocation exists) {
+        IO.delete(publishLocation)
       }
-      IO.copyDirectory(newAPI, repo / "latest" / "api")
+      IO.copyDirectory(newAPI, publishLocation / "api")
       //IO.copyDirectory(newSXR, repo / "latest" / "sxr")
       repo
     }
@@ -58,12 +60,16 @@ object GhPages extends Plugin {
       git("add", ".")(repo, log)
       git("commit", "-m", msg, "--allow-empty")(repo, log)
       for(tagString <- tag) git("tag", tagString)(repo, log)
-      push(repo, log)
+      //HACK - why isn't parallelExecution := false working?
+      synchronized {
+	    pull(repo, log)
+        push(repo, log)
+      }
     }
     private def push(cwd: File, log: Logger) = git("push")(cwd, log)
     private def pull(cwd: File, log: Logger) = git("pull")(cwd, log)
     private def updated(remote: String, branch: Option[String], cwd: File, log: Logger): Unit =
-      if(cwd.exists) pull(cwd, log)
+      if(cwd.exists) git("reset", "--hard",  "origin/gh-pages")(cwd, log)
       else branch match {
         case None => git("clone", remote, ".")(cwd, log)
         case Some(b) => git("clone", "-b", b, remote, ".")(cwd, log)
