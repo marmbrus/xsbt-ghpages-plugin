@@ -50,8 +50,8 @@ object GhPages extends Plugin {
         ()
     }
 
-    private def copyAPIDoc0 = (updatedPagesRepository, doc in Compile, classDirectory in Compile, thisProjectRef, streams) map {
-      (repo, newAPI, buildTarget, currentProject, s) =>
+    private def copyAPIDoc0 = (updatedPagesRepository, doc in Compile, compile in Compile,  classDirectory in Compile, thisProjectRef, streams) map {
+      (repo, newAPI, compileResult, buildTarget, currentProject, s) =>
         val publishLocation = repo / currentProject.project / "latest"
         val newSXR = buildTarget / ".." / "classes.sxr"
         git("rm", "-r", "--ignore-unmatch", publishLocation.toString)(repo, s.log)
